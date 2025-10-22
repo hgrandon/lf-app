@@ -1,178 +1,196 @@
-"use client";
-import { useEffect, useMemo, useState } from "react";
-import supabase from "@/lib/supabaseClient";
+'use client'
 
-export default function TestPage() {
-  const [telefono, setTelefono] = useState("");
-  const [nombre, setNombre] = useState("");
-  const [direccion, setDireccion] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [clientes, setClientes] = useState([]);
-  const [q, setQ] = useState("");
+import { useEffect, useState } from 'react'
+import { supabase } from '../../lib/supabaseClient'
 
-  const filtered = useMemo(() => {
-    const t = q.trim().toUpperCase();
-    if (!t) return clientes;
-    return clientes.filter(
-      (c) =>
-        (c.nombre || "").toUpperCase().includes(t) ||
-        (c.telefono || "").toUpperCase().includes(t) ||
-        (c.direccion || "").toUpperCase().includes(t)
-    );
-  }, [q, clientes]);
+export default function TestConn() {
+  // estado formulario
+  const [telefono, setTelefono] = useState('')
+  const [nombre, setNombre] = useState('')
+  const [direccion, setDireccion] = useState('')
 
-  async function cargar() {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("clientes")
-      .select("*")
-      .order("nombre", { ascending: true });
-    if (error) console.error(error);
-    setClientes(data || []);
-    setLoading(false);
-  }
+  // estado lista y ui
+  const [clientes, setClientes] = useState([])
+  const [busqueda, setBusqueda] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [editing, setEditing] = useState(false) // modo edición (bloquea teléfono)
 
+  // cargar clientes al montar
   useEffect(() => {
-    cargar();
-  }, []);
+    fetchClientes()
+  }, [])
 
-  const cleanPhone = (v) =>
-    v.replace(/[^\d+]/g, "").slice(0, 15); // formatea suave
+  async function fetchClientes() {
+    const { data, error } = await supabase
+      .from('clientes')
+      .select('*')
+      .order('id', { ascending: false })
+    if (!error) setClientes(data || [])
+  }
 
-  async function guardar() {
-    if (!telefono) {
-      toast("El teléfono es obligatorio");
-      return;
+  function limpiarForm() {
+    setTelefono('')
+    setNombre('')
+    setDireccion('')
+    setEditing(false)
+  }
+
+  async function guardarOModificar() {
+    if (!telefono.trim()) {
+      alert('El teléfono es obligatorio.')
+      return
     }
-    setSaving(true);
-    const payload = {
-      telefono: cleanPhone(telefono),
-      nombre: (nombre || "").toUpperCase().trim(),
-      direccion: (direccion || "").toUpperCase().trim(),
-    };
-
-    const { data, error } = await supabase.from("clientes").insert([payload]).select("*");
-    setSaving(false);
+    setLoading(true)
+    const { error } = await supabase
+      .from('clientes')
+      .upsert([{ telefono, nombre, direccion }], { onConflict: 'telefono' })
+    setLoading(false)
 
     if (error) {
-      console.error(error);
-      toast("No se pudo guardar. Revisa políticas RLS.");
-      return;
+      alert('Error: ' + error.message)
+    } else {
+      alert(editing ? '✅ Cliente modificado.' : '✅ Cliente guardado.')
+      limpiarForm()
+      fetchClientes()
     }
-    toast("Cliente guardado ✅");
-    setTelefono("");
-    setNombre("");
-    setDireccion("");
-    setClientes((prev) => [...prev, ...(data || [])]);
   }
 
-  async function eliminar(telefono) {
-    if (!confirm("¿Eliminar este cliente?")) return;
-    const { error } = await supabase.from("clientes").delete().eq("telefono", telefono);
+  function empezarEdicion(cli) {
+    setTelefono(cli.telefono)
+    setNombre(cli.nombre || '')
+    setDireccion(cli.direccion || '')
+    setEditing(true)
+  }
+
+  async function eliminarCliente(tel) {
+    if (!confirm(`¿Eliminar cliente con teléfono ${tel}?`)) return
+    const { error } = await supabase.from('clientes').delete().eq('telefono', tel)
     if (error) {
-      console.error(error);
-      toast("No se pudo eliminar. Revisa políticas RLS.");
-      return;
+      alert('No se pudo eliminar: ' + error.message)
+    } else {
+      alert('🗑️ Cliente eliminado.')
+      if (editing && tel === telefono) limpiarForm()
+      fetchClientes()
     }
-    setClientes((prev) => prev.filter((x) => x.telefono !== telefono));
-    toast("Cliente eliminado 🗑️");
   }
 
-  function toast(msg) {
-    const el = document.createElement("div");
-    el.className = "lf-toast";
-    el.textContent = msg;
-    document.body.appendChild(el);
-    setTimeout(() => el.classList.add("show"));
-    setTimeout(() => {
-      el.classList.remove("show");
-      setTimeout(() => el.remove(), 300);
-    }, 1800);
-  }
-
-  const canSave = !!telefono && !saving;
+  const clientesFiltrados = clientes.filter((c) =>
+    [c.telefono || '', c.nombre || '', c.direccion || '']
+      .join(' ')
+      .toLowerCase()
+      .includes(busqueda.toLowerCase())
+  )
 
   return (
-    <main className="lf-wrap">
-      <section className="lf-card">
-        <header className="lf-header">
-          <h1>📱 Prueba de conexión con Supabase</h1>
-          <div className="lf-subtitle">El dato clave es el <b>Teléfono</b></div>
-        </header>
+    <div className="p-6 max-w-5xl mx-auto space-y-8">
+      {/* Formulario */}
+      <div className="bg-white shadow-lg rounded-2xl p-6">
+        <h2 className="text-2xl font-bold flex items-center gap-2">
+          📱 Prueba de conexión con Supabase
+        </h2>
+        <p className="text-gray-600 mb-4">
+          El dato clave es el <b>Teléfono</b>
+        </p>
 
-        {/* FORM */}
-        <div className="lf-form">
-          <div className="lf-field">
-            <label>Teléfono</label>
-            <input
-              inputMode="tel"
-              placeholder="Ej: 912345678"
-              value={telefono}
-              onChange={(e) => setTelefono(cleanPhone(e.target.value))}
-            />
-          </div>
-
-          <div className="lf-field">
-            <label>Nombre</label>
-            <input
-              placeholder="Ej: Juan Pérez"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-            />
-          </div>
-
-          <div className="lf-field">
-            <label>Dirección</label>
-            <input
-              placeholder="Ej: Av. Principal 123"
-              value={direccion}
-              onChange={(e) => setDireccion(e.target.value)}
-            />
-          </div>
-
-          <div className="lf-actions">
-            <button className="lf-btn" disabled={!canSave} onClick={guardar}>
-              {saving ? "Guardando…" : "Guardar"}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* LISTA */}
-      <section className="lf-card">
-        <div className="lf-list-header">
-          <h2>📋 Lista de Clientes</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <input
-            className="lf-search"
-            placeholder="Buscar por nombre, teléfono o dirección"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
+            type="text"
+            placeholder="Ej: 912345678"
+            value={telefono}
+            onChange={(e) => setTelefono(e.target.value)}
+            className="border rounded-md p-2"
+            disabled={editing} // bloquear teléfono al editar
+          />
+          <input
+            type="text"
+            placeholder="Ej: Juan Pérez"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            className="border rounded-md p-2"
+          />
+          <input
+            type="text"
+            placeholder="Ej: Av. Principal 123"
+            value={direccion}
+            onChange={(e) => setDireccion(e.target.value)}
+            className="border rounded-md p-2"
           />
         </div>
 
-        {loading ? (
-          <div className="lf-empty">Cargando…</div>
-        ) : filtered.length === 0 ? (
-          <div className="lf-empty">Sin resultados</div>
+        <div className="mt-4 flex gap-3">
+          <button
+            onClick={guardarOModificar}
+            disabled={loading}
+            className="bg-purple-500 text-white px-6 py-2 rounded-lg hover:bg-purple-600 disabled:opacity-60"
+          >
+            {loading ? 'Guardando...' : editing ? 'Modificar' : 'Guardar'}
+          </button>
+
+          {editing && (
+            <button
+              onClick={limpiarForm}
+              className="bg-gray-200 px-6 py-2 rounded-lg hover:bg-gray-300"
+            >
+              Cancelar
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Lista */}
+      <div className="bg-white shadow-lg rounded-2xl p-6">
+        <h3 className="text-xl font-bold flex items-center gap-2">
+          📋 Lista de Clientes
+        </h3>
+        <input
+          type="text"
+          placeholder="Buscar por nombre, teléfono o dirección"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          className="border rounded-md p-2 mt-3 w-full"
+        />
+
+        {clientesFiltrados.length === 0 ? (
+          <p className="text-gray-500 mt-6 text-center">Sin resultados</p>
         ) : (
-          <ul className="lf-list">
-            {filtered.map((c) => (
-              <li key={c.telefono} className="lf-item">
-                <div className="lf-item-text">
-                  <strong>{(c.nombre || "").toUpperCase()}</strong>
-                  <span> — {c.telefono} — {(c.direccion || "").toUpperCase()}</span>
-                </div>
-                <div className="lf-item-actions">
-                  <button className="lf-btn ghost" onClick={() => eliminar(c.telefono)}>
-                    Eliminar
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <table className="mt-4 w-full border-collapse">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="border p-2 text-left">Teléfono</th>
+                <th className="border p-2 text-left">Nombre</th>
+                <th className="border p-2 text-left">Dirección</th>
+                <th className="border p-2 text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {clientesFiltrados.map((cli) => (
+                <tr key={cli.id ?? cli.telefono}>
+                  <td className="border p-2">{cli.telefono}</td>
+                  <td className="border p-2">{cli.nombre}</td>
+                  <td className="border p-2">{cli.direccion}</td>
+                  <td className="border p-2">
+                    <div className="flex gap-2 justify-center">
+                      <button
+                        onClick={() => empezarEdicion(cli)}
+                        className="px-3 py-1 rounded-md bg-blue-500 text-white hover:bg-blue-600"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => eliminarCliente(cli.telefono)}
+                        className="px-3 py-1 rounded-md bg-rose-500 text-white hover:bg-rose-600"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
-      </section>
-    </main>
-  );
+      </div>
+    </div>
+  )
 }
+
