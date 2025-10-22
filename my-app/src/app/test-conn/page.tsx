@@ -1,31 +1,31 @@
-'use client';
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+'use client'
+
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabaseClient' // ✅ Importa correctamente el cliente desde la carpeta lib
 
 export default function TestConn() {
-  const [status, setStatus] = useState<'loading'|'ok'|'fail'>('loading');
-  const [details, setDetails] = useState<string>('');
+  const [status, setStatus] = useState<'loading' | 'ok' | 'fail'>('loading')
+  const [details, setDetails] = useState<string>('')
 
   useEffect(() => {
-    (async () => {
+    const testConnection = async () => {
       try {
-        const { error, count } = await supabase
-          .from('customers')
-          .select('*', { count: 'exact', head: true }); // solo cuenta filas
+        const { count, error } = await supabase
+          .from('clientes') // 👈 cambia el nombre si tu tabla es diferente
+          .select('*', { count: 'exact', head: true })
 
-        if (error) {
-          setStatus('fail');
-          setDetails(`Error Supabase: ${error.message}`);
-        } else {
-          setStatus('ok');
-          setDetails(`✅ Conexión correcta. Filas visibles (RLS activo): ${count ?? 0}`);
-        }
+        if (error) throw error
+
+        setStatus('ok')
+        setDetails(`✅ Conexión correcta. Filas visibles: ${count ?? 0}`)
       } catch (e: any) {
-        setStatus('fail');
-        setDetails(e?.message ?? 'Error desconocido');
+        setStatus('fail')
+        setDetails(`❌ Error Supabase: ${e.message}`)
       }
-    })();
-  }, []);
+    }
+
+    testConnection()
+  }, [])
 
   return (
     <main style={{ padding: 24, fontFamily: 'system-ui' }}>
@@ -38,16 +38,8 @@ export default function TestConn() {
           ? '✅ Éxito'
           : '❌ Falló'}
       </p>
-      <pre
-        style={{
-          background: '#f6f6f6',
-          padding: 12,
-          borderRadius: 8,
-          whiteSpace: 'pre-wrap',
-        }}
-      >
-        {details}
-      </pre>
+      <pre>{details}</pre>
     </main>
-  );
+  )
 }
+
