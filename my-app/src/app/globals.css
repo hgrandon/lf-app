@@ -1,4 +1,8 @@
 /* ====== LAVANDERÍA UI minimalist ====== */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   --bg: #f7f7fb;
   --card: #ffffff;

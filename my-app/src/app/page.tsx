@@ -1,103 +1,120 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabaseClient'
+
+export default function TestPage() {
+  const [clientes, setClientes] = useState<any[]>([])
+  const [nuevo, setNuevo] = useState({ telefono: '', nombre: '', direccion: '' })
+  const [busqueda, setBusqueda] = useState('')
+
+  // === Cargar clientes desde Supabase ===
+  useEffect(() => {
+    fetchClientes()
+  }, [])
+
+  async function fetchClientes() {
+    const { data, error } = await supabase.from('clientes').select('*').order('telefono', { ascending: true })
+    if (!error && data) setClientes(data)
+  }
+
+  // === Guardar nuevo cliente ===
+  async function guardarCliente() {
+    if (!nuevo.telefono || !nuevo.nombre) return alert('Falta teléfono o nombre')
+    const { error } = await supabase.from('clientes').insert([nuevo])
+    if (!error) {
+      setNuevo({ telefono: '', nombre: '', direccion: '' })
+      fetchClientes()
+    }
+  }
+
+  // === Eliminar cliente ===
+  async function eliminarCliente(telefono: string) {
+    if (!confirm('¿Eliminar cliente?')) return
+    await supabase.from('clientes').delete().eq('telefono', telefono)
+    fetchClientes()
+  }
+
+  const clientesFiltrados = clientes.filter(c =>
+    c.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
+    c.telefono?.includes(busqueda)
+  )
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="min-h-screen bg-gradient-to-b from-purple-50 to-indigo-100 p-8">
+      <div className="max-w-3xl mx-auto bg-white shadow-lg rounded-xl p-6">
+        <h1 className="text-2xl font-bold text-indigo-700 mb-6 text-center">
+          📋 Lista de Clientes
+        </h1>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+        {/* Formulario */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+          <input
+            className="border rounded-lg px-3 py-2 flex-1"
+            placeholder="Teléfono"
+            value={nuevo.telefono}
+            onChange={e => setNuevo({ ...nuevo, telefono: e.target.value })}
+          />
+          <input
+            className="border rounded-lg px-3 py-2 flex-1"
+            placeholder="Nombre"
+            value={nuevo.nombre}
+            onChange={e => setNuevo({ ...nuevo, nombre: e.target.value })}
+          />
+          <input
+            className="border rounded-lg px-3 py-2 flex-1"
+            placeholder="Dirección"
+            value={nuevo.direccion}
+            onChange={e => setNuevo({ ...nuevo, direccion: e.target.value })}
+          />
+          <button
+            onClick={guardarCliente}
+            className="bg-indigo-600 text-white rounded-lg px-4 py-2 hover:bg-indigo-700 transition"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            Guardar
+          </button>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        {/* Buscador */}
+        <input
+          className="border rounded-lg w-full mb-4 px-3 py-2"
+          placeholder="Buscar por nombre o teléfono..."
+          value={busqueda}
+          onChange={e => setBusqueda(e.target.value)}
+        />
+
+        {/* Tabla */}
+        <div className="overflow-x-auto">
+          <table className="min-w-full border text-sm">
+            <thead className="bg-indigo-600 text-white">
+              <tr>
+                <th className="px-3 py-2 text-left">Teléfono</th>
+                <th className="px-3 py-2 text-left">Nombre</th>
+                <th className="px-3 py-2 text-left">Dirección</th>
+                <th className="px-3 py-2 text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {clientesFiltrados.map((c) => (
+                <tr key={c.telefono} className="border-b hover:bg-indigo-50">
+                  <td className="px-3 py-2">{c.telefono}</td>
+                  <td className="px-3 py-2 font-medium">{c.nombre}</td>
+                  <td className="px-3 py-2">{c.direccion}</td>
+                  <td className="px-3 py-2 text-center">
+                    <button
+                      onClick={() => eliminarCliente(c.telefono)}
+                      className="bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600 transition"
+                    >
+                      Eliminar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
-  );
+  )
 }
+
