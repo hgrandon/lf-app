@@ -1,6 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 
+// ✅ URL exacta de tu proyecto Supabase (verificada en Settings → API → Project URL)
 const supabaseUrl = 'https://vmwhngvffpmrkkuvtzoe.supabase.co'
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlIjoiN3JtYmpvbnYxMW9sWTF0aHNjczMzZ0lGZTlZIn0.gWBWvE3rVGLvMfxV_NH2gUG4n7aN2ZfC2T2c7vN8m5Y'
 
+// ✅ Clave pública anon (copiada completa de Settings → API → anon public)
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtd2huZ3ZmZnBtcmtrdXZ0em9lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA5ODgxNzQsImV4cCI6MjA3NjU2NDE3NH0.jx2ET8WACOkGgys_lkex8mvMI2sAJBryogFYJnXRj_U'
+
+// ✅ Crear cliente Supabase
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
