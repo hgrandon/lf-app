@@ -4,35 +4,45 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 
 export default function TestConn() {
-  // estado formulario
   const [telefono, setTelefono] = useState('')
   const [nombre, setNombre] = useState('')
   const [direccion, setDireccion] = useState('')
 
-  // estado lista y ui
   const [clientes, setClientes] = useState([])
   const [busqueda, setBusqueda] = useState('')
   const [loading, setLoading] = useState(false)
-  const [editing, setEditing] = useState(false) // modo edición (bloquea teléfono)
+  const [editing, setEditing] = useState(false)
 
-  // cargar clientes al montar
   useEffect(() => {
     fetchClientes()
+
+    // 🟢 Escucha en tiempo real los cambios en la tabla
+    const channel = supabase
+      .channel('realtime:clientes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'clientes' },
+        () => fetchClientes()
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   async function fetchClientes() {
-    const { data, error } = await supabase
-      .from('clientes')
-      .select('*')
-      .order('id', { ascending: false })
-    if (!error) setClientes(data || [])
-  }
-
-  function limpiarForm() {
-    setTelefono('')
-    setNombre('')
-    setDireccion('')
-    setEditing(false)
+    try {
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('telefono, nombre, direccion')
+        .order('telefono', { ascending: true })
+      if (error) throw error
+      console.log('CLIENTES:', data)
+      setClientes(data || [])
+    } catch (e) {
+      console.error('Error al cargar clientes:', e)
+    }
   }
 
   async function guardarOModificar() {
@@ -41,24 +51,29 @@ export default function TestConn() {
       return
     }
     setLoading(true)
-    const { error } = await supabase
-      .from('clientes')
-      .upsert([{ telefono, nombre, direccion }], { onConflict: 'telefono' })
-    setLoading(false)
+    try {
+      const { error } = await supabase
+        .from('clientes')
+        .upsert([{ telefono, nombre, direccion }], { onConflict: 'telefono' })
+      if (error) throw error
 
-    if (error) {
-      alert('Error: ' + error.message)
-    } else {
       alert(editing ? '✅ Cliente modificado.' : '✅ Cliente guardado.')
-      limpiarForm()
-      fetchClientes()
+      setTelefono('')
+      setNombre('')
+      setDireccion('')
+      setEditing(false)
+      await fetchClientes()
+    } catch (e) {
+      alert('Error: ' + e.message)
+    } finally {
+      setLoading(false)
     }
   }
 
   function empezarEdicion(cli) {
     setTelefono(cli.telefono)
-    setNombre(cli.nombre || '')
-    setDireccion(cli.direccion || '')
+    setNombre(cli.nombre)
+    setDireccion(cli.direccion)
     setEditing(true)
   }
 
@@ -69,51 +84,41 @@ export default function TestConn() {
       alert('No se pudo eliminar: ' + error.message)
     } else {
       alert('🗑️ Cliente eliminado.')
-      if (editing && tel === telefono) limpiarForm()
       fetchClientes()
     }
   }
 
   const clientesFiltrados = clientes.filter((c) =>
-    [c.telefono || '', c.nombre || '', c.direccion || '']
-      .join(' ')
-      .toLowerCase()
-      .includes(busqueda.toLowerCase())
+    [c.telefono, c.nombre, c.direccion].join(' ').toLowerCase().includes(busqueda.toLowerCase())
   )
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
-      {/* Formulario */}
       <div className="bg-white shadow-lg rounded-2xl p-6">
-        <h2 className="text-2xl font-bold flex items-center gap-2">
-          📱 Prueba de conexión con Supabase
-        </h2>
-        <p className="text-gray-600 mb-4">
-          El dato clave es el <b>Teléfono</b>
-        </p>
+        <h2 className="text-2xl font-bold mb-4">📱 Prueba de conexión con Supabase</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <input
             type="text"
-            placeholder="Ej: 912345678"
+            placeholder="Teléfono"
             value={telefono}
             onChange={(e) => setTelefono(e.target.value)}
-            className="border rounded-md p-2"
-            disabled={editing} // bloquear teléfono al editar
+            disabled={editing}
+            className="border p-2 rounded-md"
           />
           <input
             type="text"
-            placeholder="Ej: Juan Pérez"
+            placeholder="Nombre"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
-            className="border rounded-md p-2"
+            className="border p-2 rounded-md"
           />
           <input
             type="text"
-            placeholder="Ej: Av. Principal 123"
+            placeholder="Dirección"
             value={direccion}
             onChange={(e) => setDireccion(e.target.value)}
-            className="border rounded-md p-2"
+            className="border p-2 rounded-md"
           />
         </div>
 
@@ -125,11 +130,15 @@ export default function TestConn() {
           >
             {loading ? 'Guardando...' : editing ? 'Modificar' : 'Guardar'}
           </button>
-
           {editing && (
             <button
-              onClick={limpiarForm}
-              className="bg-gray-200 px-6 py-2 rounded-lg hover:bg-gray-300"
+              onClick={() => {
+                setEditing(false)
+                setTelefono('')
+                setNombre('')
+                setDireccion('')
+              }}
+              className="bg-gray-300 px-6 py-2 rounded-lg hover:bg-gray-400"
             >
               Cancelar
             </button>
@@ -137,60 +146,59 @@ export default function TestConn() {
         </div>
       </div>
 
-      {/* Lista */}
       <div className="bg-white shadow-lg rounded-2xl p-6">
-        <h3 className="text-xl font-bold flex items-center gap-2">
-          📋 Lista de Clientes
-        </h3>
+        <h3 className="text-xl font-bold mb-3">📋 Lista de Clientes</h3>
         <input
           type="text"
-          placeholder="Buscar por nombre, teléfono o dirección"
+          placeholder="Buscar..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          className="border rounded-md p-2 mt-3 w-full"
+          className="border p-2 w-full rounded-md"
         />
-
-        {clientesFiltrados.length === 0 ? (
-          <p className="text-gray-500 mt-6 text-center">Sin resultados</p>
-        ) : (
-          <table className="mt-4 w-full border-collapse">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="border p-2 text-left">Teléfono</th>
-                <th className="border p-2 text-left">Nombre</th>
-                <th className="border p-2 text-left">Dirección</th>
-                <th className="border p-2 text-center">Acciones</th>
+        <table className="w-full mt-4 border-collapse">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="border p-2">Teléfono</th>
+              <th className="border p-2">Nombre</th>
+              <th className="border p-2">Dirección</th>
+              <th className="border p-2 text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {clientesFiltrados.length === 0 ? (
+              <tr>
+                <td colSpan="4" className="text-center text-gray-500 p-4">
+                  Sin resultados
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {clientesFiltrados.map((cli) => (
-                <tr key={cli.id ?? cli.telefono}>
+            ) : (
+              clientesFiltrados.map((cli) => (
+                <tr key={cli.telefono}>
                   <td className="border p-2">{cli.telefono}</td>
                   <td className="border p-2">{cli.nombre}</td>
                   <td className="border p-2">{cli.direccion}</td>
-                  <td className="border p-2">
-                    <div className="flex gap-2 justify-center">
-                      <button
-                        onClick={() => empezarEdicion(cli)}
-                        className="px-3 py-1 rounded-md bg-blue-500 text-white hover:bg-blue-600"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => eliminarCliente(cli.telefono)}
-                        className="px-3 py-1 rounded-md bg-rose-500 text-white hover:bg-rose-600"
-                      >
-                        Eliminar
-                      </button>
-                    </div>
+                  <td className="border p-2 text-center">
+                    <button
+                      onClick={() => empezarEdicion(cli)}
+                      className="px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 mr-2"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => eliminarCliente(cli.telefono)}
+                      className="px-3 py-1 bg-rose-500 text-white rounded-md hover:bg-rose-600"
+                    >
+                      Eliminar
+                    </button>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   )
 }
+
 
