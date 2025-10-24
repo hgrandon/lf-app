@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "rootDirectory": "my-app",
+  "projectSettings": {
+    "framework": "nextjs",
+    "buildCommand": "npm run build",
+    "installCommand": "npm install",
+    "outputDirectory": ".next"
+  }
+}

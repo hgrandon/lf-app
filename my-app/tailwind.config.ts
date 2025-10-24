@@ -13,7 +13,9 @@ const config: Config = {
       },
     },
   },
+  darkMode: 'media', // ⬅️ Agregado: modo oscuro automático
   plugins: [],
 }
 
 export default config
+
